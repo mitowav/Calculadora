@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Calculadora">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Calculadora</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #000; color: #fff;
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    height: 100dvh; display: flex; flex-direction: column;
+    overflow: hidden; user-select: none;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: center;
+    padding: 14px 18px 0; position: relative;
+  }
+  .topbar-title {
+    font-size: 17px; font-weight: 600; color: #fff;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #ff6a00;
+  }
+  .topbar-menu {
+    position: absolute; right: 18px;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.6); cursor: pointer;
+  }
+  .display {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: flex-end;
+    padding: 0 22px 18px; overflow: hidden;
+  }
+  .digits-row {
+    display: flex; flex-direction: row;
+    justify-content: flex-end; align-items: center;
+    font-size: 72px; font-weight: 200;
+    letter-spacing: -2px; line-height: 1.0;
+    white-space: nowrap; overflow: hidden; width: 100%;
+  }
+  .digits-row.sz-med { font-size: 50px; letter-spacing: -1px; }
+  .digits-row.sz-sm  { font-size: 36px; letter-spacing: 0; }
+  .digit-char { display: inline-block; }
+
+  .keypad {
+    padding: 8px 12px 32px;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr); gap: 10px;
+  }
+  .btn {
+    border-radius: 16px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit; font-size: 26px; font-weight: 400;
+    aspect-ratio: 1; transition: filter 0.08s, transform 0.08s;
+  }
+  .btn:active { filter: brightness(1.4); transform: scale(0.92); }
+  .btn-func { background: #636366; color: #fff; font-size: 22px; font-weight: 500; }
+  .btn-op   { background: #ff6a00; color: #fff; font-size: 30px; font-weight: 300; }
+  .btn-num  { background: #1c1c1e; color: #fff; }
+  .btn-eq   { background: #ff6a00; color: #fff; font-size: 32px; }
+
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.97); z-index: 100;
+    flex-direction: column; align-items: center; justify-content: center;
+    padding: 36px 28px; gap: 16px;
+  }
+  .overlay.show { display: flex; }
+  .overlay-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 2px; }
+  .overlay-input { background: #1c1c1e; border: 1.5px solid rgba(255,106,0,0.6); border-radius: 16px; color: #fff; font-size: 44px; font-weight: 200; text-align: center; padding: 18px; width: 100%; outline: none; }
+  .overlay-hint { font-size: 11px; color: rgba(255,255,255,0.2); text-align: center; }
+  .overlay-save { background: #ff6a00; color: #fff; border: none; border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer; margin-top: 6px; }
+  .overlay-cancel { background: transparent; color: rgba(255,255,255,0.25); border: none; font-size: 14px; cursor: pointer; padding: 10px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">Calculadora</div>
+  <div class="topbar-menu" id="menuBtn">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/>
+    </svg>
+  </div>
+</div>
+
+<div class="display">
+  <div class="digits-row" id="main">0</div>
+</div>
+
+<div class="keypad">
+  <button class="btn btn-func" id="acBtn" onclick="pressClear()">AC</button>
+  <button class="btn btn-func" onclick="deleteLast()">
+    <svg width="24" height="18" viewBox="0 0 28 20" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M10 2H25a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H10L2 10z"/>
+      <line x1="14" y1="7" x2="19" y2="13"/><line x1="19" y1="7" x2="14" y2="13"/>
+    </svg>
+  </button>
+  <button class="btn btn-func" onclick="pressPercent()">%</button>
+  <button class="btn btn-op"   onclick="pressOp('/')">÷</button>
+  <button class="btn btn-num" onclick="pressNum('7')">7</button>
+  <button class="btn btn-num" onclick="pressNum('8')">8</button>
+  <button class="btn btn-num" onclick="pressNum('9')">9</button>
+  <button class="btn btn-op"  onclick="pressOp('×')">×</button>
+  <button class="btn btn-num" onclick="pressNum('4')">4</button>
+  <button class="btn btn-num" onclick="pressNum('5')">5</button>
+  <button class="btn btn-num" onclick="pressNum('6')">6</button>
+  <button class="btn btn-op"  onclick="pressOp('−')">−</button>
+  <button class="btn btn-num" onclick="pressNum('1')">1</button>
+  <button class="btn btn-num" onclick="pressNum('2')">2</button>
+  <button class="btn btn-num" onclick="pressNum('3')">3</button>
+  <button class="btn btn-op"  onclick="pressOp('+')">+</button>
+  <button class="btn btn-func" onclick="pressSign()" style="font-size:17px;">+/−</button>
+  <button class="btn btn-num"  onclick="pressNum('0')">0</button>
+  <button class="btn btn-num"  onclick="pressDot()">,</button>
+  <button class="btn btn-eq"   onclick="pressEquals()">=</button>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-title">Resultado del truco</div>
+  <input class="overlay-input" id="fakeInput" type="number" inputmode="numeric" placeholder="0">
+  <div class="overlay-hint">Vacío = calculadora normal</div>
+  <button class="overlay-save" onclick="saveConfig()">Guardar</button>
+  <button class="overlay-cancel" onclick="closeOverlay()">Cancelar</button>
+</div>
+
+<script>
+  let cur = '0', prevVal = null, op = null, freshCalc = false, fakeNum = null;
+  let taps = 0, tapTimer = null;
+  const mainEl = document.getElementById('main');
+  const acBtn  = document.getElementById('acBtn');
+
+  try { const s = localStorage.getItem('fakeNum'); if(s) fakeNum = s; } catch(e){}
+
+  function renderSpans(val) {
+    mainEl.innerHTML = '';
+    val.split('').forEach(c => {
+      const s = document.createElement('span');
+      s.className = 'digit-char';
+      s.textContent = c;
+      mainEl.appendChild(s);
+    });
+    const l = val.replace(/[-,.]/g,'').length;
+    mainEl.className = 'digits-row' + (l > 9 ? ' sz-sm' : l > 6 ? ' sz-med' : '');
+    acBtn.textContent = (cur === '0' && prevVal === null && op === null) ? 'AC' : 'C';
+  }
+
+  function toNum(s) { return parseFloat(s.replace(',','.')); }
+  function toStr(n) {
+    if (!isFinite(n)) return 'Error';
+    return parseFloat(n.toPrecision(12)).toString().replace('.',',');
+  }
+  function pressNum(d) {
+    if (freshCalc) { cur = d; freshCalc = false; }
+    else cur = cur === '0' ? d : cur + d;
+    renderSpans(cur);
+  }
+  function pressDot() {
+    if (freshCalc) { cur = '0,'; freshCalc = false; renderSpans(cur); return; }
+    if (!cur.includes(',')) { cur += ','; renderSpans(cur); }
+  }
+  function pressOp(o) {
+    freshCalc = false;
+    if (prevVal !== null && op) prevVal = compute(prevVal, toNum(cur), op);
+    else prevVal = toNum(cur);
+    op = o; cur = '0'; renderSpans(cur);
+  }
+  function pressEquals() {
+    if (op === null || prevVal === null) return;
+    if (fakeNum !== null) {
+      cur = String(fakeNum).replace('.',',');
+      prevVal = null; op = null; freshCalc = true;
+      renderSpans(cur); return;
+    }
+    cur = toStr(compute(prevVal, toNum(cur), op));
+    prevVal = null; op = null; freshCalc = true;
+    renderSpans(cur);
+  }
+  function compute(a, b, o) {
+    if (o==='+') return a+b; if (o==='−') return a-b;
+    if (o==='×') return a*b; if (o==='/') return b!==0?a/b:NaN;
+    return b;
+  }
+  function pressClear() { cur='0'; prevVal=null; op=null; freshCalc=false; renderSpans('0'); }
+  function deleteLast() {
+    if (freshCalc) { pressClear(); return; }
+    cur = cur.length > 1 ? cur.slice(0,-1) : '0';
+    renderSpans(cur);
+  }
+  function pressPercent() { cur = toStr(toNum(cur)/100); renderSpans(cur); }
+  function pressSign() {
+    if (cur !== '0') { cur = cur.startsWith('-') ? cur.slice(1) : '-'+cur; renderSpans(cur); }
+  }
+
+  // SWIPE — gesto corto, sin animación exagerada
+  // El último dígito sigue el dedo suavemente, los demás se desplazan muy poco
+  let tx0 = null, ty0 = null, swiping = false, digitRemoved = false;
+
+  mainEl.addEventListener('touchstart', e => {
+    tx0 = e.touches[0].clientX;
+    ty0 = e.touches[0].clientY;
+    swiping = false;
+    digitRemoved = false;
+    // Reset visual
+    mainEl.querySelectorAll('.digit-char').forEach(s => {
+      s.style.transition = 'none';
+      s.style.opacity = '1';
+      s.style.transform = '';
+    });
+  }, {passive: true});
+
+  mainEl.addEventListener('touchmove', e => {
+    if (tx0 === null || digitRemoved) return;
+    const dx = e.touches[0].clientX - tx0;
+    const dy = Math.abs(e.touches[0].clientY - ty0);
+    if (dy > 18 && !swiping) { tx0 = null; return; }
+    if (dx > 6) swiping = true;
+    if (!swiping || dx <= 0) return;
+
+    const spans = Array.from(mainEl.querySelectorAll('.digit-char'));
+    if (!spans.length) return;
+    const last = spans[spans.length - 1];
+    const rest = spans.slice(0, -1);
+
+    // Umbral corto — con 35px ya se borra
+    const threshold = 35;
+    const progress = Math.min(dx / threshold, 1);
+
+    // Último dígito: sigue el dedo, se desvanece rápido
+    last.style.transition = 'none';
+    last.style.opacity = String(Math.max(0, 1 - progress * 1.2));
+    last.style.transform = `translateX(${progress * 30}px)`;
+
+    // Los demás: se desplazan muy levemente a la derecha (efecto sutil)
+    rest.forEach(s => {
+      s.style.transition = 'none';
+      s.style.transform = `translateX(${progress * 4}px)`;
+    });
+
+    // Borrar cuando llega al umbral
+    if (progress >= 1 && !digitRemoved) {
+      digitRemoved = true;
+      cur = cur.length > 1 ? cur.slice(0, -1) : '0';
+      setTimeout(() => renderSpans(cur), 50);
+    }
+  }, {passive: true});
+
+  mainEl.addEventListener('touchend', e => {
+    if (!swiping || digitRemoved) { tx0 = null; swiping = false; return; }
+    const dx = e.changedTouches[0].clientX - tx0;
+
+    if (dx > 20 && cur !== '0') {
+      // Borrar aunque no haya llegado al umbral visual
+      cur = cur.length > 1 ? cur.slice(0, -1) : '0';
+      renderSpans(cur);
+    } else {
+      // Volver suavemente
+      mainEl.querySelectorAll('.digit-char').forEach(s => {
+        s.style.transition = 'opacity 0.1s, transform 0.1s';
+        s.style.opacity = '1';
+        s.style.transform = '';
+      });
+    }
+    tx0 = null; swiping = false;
+  }, {passive: true});
+
+  // Panel secreto — 5 toques en los tres puntos
+  document.getElementById('menuBtn').addEventListener('click', () => {
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => taps=0, 2000);
+    if (taps >= 5) { taps=0; openOverlay(); }
+  });
+  function openOverlay() {
+    document.getElementById('fakeInput').value = fakeNum !== null ? fakeNum : '';
+    document.getElementById('overlay').classList.add('show');
+  }
+  function closeOverlay() { document.getElementById('overlay').classList.remove('show'); }
+  function saveConfig() {
+    const v = document.getElementById('fakeInput').value.trim();
+    fakeNum = v === '' ? null : v;
+    try { if(fakeNum) localStorage.setItem('fakeNum', fakeNum); else localStorage.removeItem('fakeNum'); } catch(e){}
+    closeOverlay();
+  }
+  document.getElementById('overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('overlay')) closeOverlay();
+  });
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
