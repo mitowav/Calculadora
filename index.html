@@ -457,4 +457,173 @@
         spans[lastVisIdx].style.transform = '';
       } else if (lastVisIdx >= 0) {
         spans[lastVisIdx].style.transition = 'opacity 0.1s, transform 0.1s';
-        spans[lastVisIdx].styl
+        spans[lastVisIdx].style.opacity = '1';
+        spans[lastVisIdx].style.transform = '';
+        setTimeout(() => { spans[lastVisIdx].style.transition = ''; }, 150);
+      }
+    } else {
+      if (dx > 20 && cur !== '0') {
+        cur = cur.length > 1 ? cur.slice(0, -1) : '0';
+        renderSpans(cur);
+      } else {
+        mainEl.querySelectorAll('.digit-char').forEach(s => {
+          s.style.transition = 'opacity 0.1s, transform 0.1s';
+          s.style.opacity = '1'; s.style.transform = '';
+        });
+      }
+    }
+    tx0 = null; swiping = false;
+  }, { passive: true });
+
+  // === AGITAR ===
+  let shakeAccum = 0;
+  let lastShakeT = 0;
+  let motionReady = false;
+
+  function initMotion() {
+    if (motionReady) return;
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      // iOS requiere permiso explícito
+      DeviceMotionEvent.requestPermission().then(r => {
+        if (r === 'granted') { motionReady = true; window.addEventListener('devicemotion', onMotion, true); }
+      }).catch(() => {});
+    } else if (window.DeviceMotionEvent) {
+      motionReady = true;
+      window.addEventListener('devicemotion', onMotion, true);
+    }
+  }
+
+  function onMotion(e) {
+    if (!mg.shakeEnabled || mg.swipeMode !== 'stay') return;
+
+    const spans = Array.from(mainEl.querySelectorAll('.digit-char'));
+    const totalDigits = spans.length;
+    const visibleCount = spans.filter(s => !s.classList.contains('hidden-magic')).length;
+
+    // Solo funciona cuando TODOS están ocultos (0 visibles)
+    if (visibleCount > 0 || hiddenIndices.length === 0) {
+      shakeAccum = 0;
+      return;
+    }
+
+    const acc = e.accelerationIncludingGravity || e.acceleration;
+    if (!acc || acc.x === null) return;
+
+    const force = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+    const shake = Math.abs(force - 9.8);
+
+    const now = Date.now();
+    if (now - lastShakeT < 60) return;
+    lastShakeT = now;
+
+    if (shake > 2.5) {
+      shakeAccum += shake * 0.12;
+    } else {
+      shakeAccum = Math.max(0, shakeAccum - 0.15);
+    }
+
+    // Revelar dígitos de izquierda a derecha
+    const sorted = [...hiddenIndices].sort((a, b) => a - b);
+    const perDigit = 10;
+    const toReveal = Math.min(Math.floor(shakeAccum / perDigit), sorted.length);
+    const partialFrac = (shakeAccum % perDigit) / perDigit;
+
+    for (let i = 0; i < sorted.length; i++) {
+      const span = spans[sorted[i]];
+      if (!span) continue;
+
+      if (i < toReveal) {
+        // Completamente visible
+        span.classList.remove('hidden-magic');
+        span.style.opacity = '1';
+        span.style.visibility = 'visible';
+      } else if (i === toReveal) {
+        // Apareciendo progresivamente
+        span.classList.remove('hidden-magic');
+        span.style.visibility = 'visible';
+        span.style.opacity = String(partialFrac);
+      }
+    }
+
+    // Si todos revelados, limpiar
+    if (toReveal >= sorted.length) {
+      hiddenIndices = [];
+      shakeAccum = 0;
+      spans.forEach(s => {
+        s.classList.remove('hidden-magic');
+        s.style.opacity = '1';
+        s.style.visibility = 'visible';
+      });
+    }
+  }
+
+  // Iniciar detección de movimiento al primer toque en la pantalla
+  document.addEventListener('touchstart', function firstTouch() {
+    initMotion();
+    document.removeEventListener('touchstart', firstTouch);
+  }, { once: true });
+
+  // También intentar iniciar directamente
+  initMotion();
+
+  // === PANEL MÁGICO ===
+  let taps = 0, tapTimer = null;
+  document.getElementById('menuBtn').addEventListener('click', () => {
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => taps = 0, 2000);
+    if (taps >= 5) { taps = 0; openMagic(); }
+  });
+
+  function openMagic() { syncUI(); document.getElementById('magic').classList.add('show'); }
+  function closeMagic() {
+    mg.fakeNum = document.getElementById('mFakeNum').value.trim() || null;
+    mg.birthYear = document.getElementById('mBirthYear').value.trim() || null;
+    mg.phone = document.getElementById('mPhone').value.trim() || null;
+    mg.alwaysNum = document.getElementById('mAlways').value.trim() || null;
+    saveMg();
+    document.getElementById('magic').classList.remove('show');
+    initMotion();
+  }
+
+  function syncUI() {
+    document.getElementById('mFakeNum').value = mg.fakeNum || '';
+    document.getElementById('mBirthYear').value = mg.birthYear || '';
+    document.getElementById('mPhone').value = mg.phone || '';
+    document.getElementById('mAlways').value = mg.alwaysNum || '';
+    syncT('mShowTime', mg.showTime); syncT('mShowDate', mg.showDate);
+    syncT('mShowAge', mg.showAge); syncT('mShowPhone', mg.showPhone);
+    syncT('mReverse', mg.reverse); syncT('mShowAlways', mg.alwaysSame);
+    syncT('mShake', mg.shakeEnabled);
+    syncC('mEqTaps', String(mg.eqTapsNeeded));
+    syncC('mSwipeMode', mg.swipeMode);
+  }
+  function syncT(id, v) { const el = document.getElementById(id); if (v) el.classList.add('on'); else el.classList.remove('on'); }
+  function toggleM(el) {
+    el.classList.toggle('on');
+    const on = el.classList.contains('on'), id = el.id;
+    if (id === 'mShowTime') mg.showTime = on;
+    if (id === 'mShowDate') mg.showDate = on;
+    if (id === 'mShowAge') mg.showAge = on;
+    if (id === 'mShowPhone') mg.showPhone = on;
+    if (id === 'mReverse') mg.reverse = on;
+    if (id === 'mShowAlways') mg.alwaysSame = on;
+    if (id === 'mShake') mg.shakeEnabled = on;
+    saveMg();
+  }
+  function syncC(gid, v) { document.querySelectorAll(`#${gid} .magic-chip`).forEach(c => c.classList.toggle('active', c.dataset.val === v)); }
+  document.querySelectorAll('#mEqTaps .magic-chip').forEach(c => {
+    c.addEventListener('click', () => { mg.eqTapsNeeded = parseInt(c.dataset.val); mg.eqTapCount = 0; syncC('mEqTaps', c.dataset.val); saveMg(); });
+  });
+  document.querySelectorAll('#mSwipeMode .magic-chip').forEach(c => {
+    c.addEventListener('click', () => { mg.swipeMode = c.dataset.val; syncC('mSwipeMode', c.dataset.val); saveMg(); });
+  });
+  function resetAll() {
+    mg = { fakeNum: null, eqTapsNeeded: 1, eqTapCount: 0, showTime: false, showDate: false, showAge: false, birthYear: null, showPhone: false, phone: null, reverse: false, alwaysSame: false, alwaysNum: null, swipeMode: 'shift', shakeEnabled: true };
+    hiddenIndices = []; shakeAccum = 0; saveMg(); syncUI();
+  }
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
