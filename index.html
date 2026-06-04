@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Calculadora">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Calculadora</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #000; color: #fff;
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    height: 100dvh; display: flex; flex-direction: column;
+    overflow: hidden; user-select: none;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: center;
+    padding: 14px 18px 0; position: relative;
+  }
+  .topbar-title {
+    font-size: 17px; font-weight: 600; color: #fff;
+    padding-bottom: 6px; border-bottom: 2px solid #ff6a00;
+  }
+  .topbar-menu {
+    position: absolute; right: 18px;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.6); cursor: pointer;
+  }
+  .display {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: flex-end;
+    padding: 0 22px 18px; overflow: hidden;
+  }
+  .digits-row {
+    display: flex; flex-direction: row;
+    justify-content: flex-end; align-items: center;
+    font-size: 72px; font-weight: 200;
+    letter-spacing: -2px; line-height: 1.0;
+    white-space: nowrap; overflow: hidden; width: 100%;
+  }
+  .digits-row.sz-med { font-size: 50px; letter-spacing: -1px; }
+  .digits-row.sz-sm  { font-size: 36px; letter-spacing: 0; }
+  .digit-char { display: inline-block; }
+  .keypad {
+    padding: 8px 12px 32px;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr); gap: 10px;
+  }
+  .btn {
+    border-radius: 16px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit; font-size: 26px; font-weight: 400;
+    aspect-ratio: 1; transition: filter 0.08s, transform 0.08s;
+  }
+  .btn:active { filter: brightness(1.4); transform: scale(0.92); }
+  .btn-func { background: #636366; color: #fff; font-size: 22px; font-weight: 500; }
+  .btn-op   { background: #ff6a00; color: #fff; font-size: 30px; font-weight: 300; }
+  .btn-num  { background: #1c1c1e; color: #fff; }
+  .btn-eq   { background: #ff6a00; color: #fff; font-size: 32px; }
+
+  /* PANEL MÁGICO */
+  .magic {
+    display: none; position: fixed; inset: 0;
+    background: #000; z-index: 100;
+    flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .magic.show { display: flex; }
+  .magic-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    position: sticky; top: 0; background: #000; z-index: 1;
+  }
+  .magic-title { font-size: 15px; font-weight: 700; color: #ff6a00; letter-spacing: 0.5px; }
+  .magic-close { background: none; border: none; color: rgba(255,255,255,0.4); font-size: 14px; cursor: pointer; padding: 8px; }
+  .magic-body { padding: 0 20px 40px; }
+  .magic-section {
+    margin-top: 22px;
+  }
+  .magic-section-title {
+    font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.2);
+    text-transform: uppercase; letter-spacing: 1.8px; margin-bottom: 10px;
+  }
+  .magic-card {
+    background: #1c1c1e; border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 8px;
+  }
+  .magic-card-title {
+    font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 6px;
+  }
+  .magic-card-desc {
+    font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.4; margin-bottom: 10px;
+  }
+  .magic-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .magic-row:last-child { margin-bottom: 0; }
+  .magic-label { font-size: 13px; color: rgba(255,255,255,0.6); flex: 1; }
+  .magic-input {
+    background: #2c2c2e; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; color: #fff; font-size: 16px;
+    text-align: center; padding: 8px 12px; width: 100px; outline: none;
+  }
+  .magic-toggle {
+    position: relative; width: 44px; height: 26px;
+    background: #3a3a3c; border-radius: 13px; cursor: pointer;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  .magic-toggle.on { background: #ff6a00; }
+  .magic-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 22px; height: 22px; background: #fff;
+    border-radius: 50%; transition: transform 0.2s;
+  }
+  .magic-toggle.on::after { transform: translateX(18px); }
+  .magic-select {
+    background: #2c2c2e; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; color: #fff; font-size: 13px;
+    padding: 8px 10px; outline: none; appearance: none;
+    -webkit-appearance: none;
+  }
+  .magic-btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .magic-chip {
+    background: #2c2c2e; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; color: rgba(255,255,255,0.5);
+    font-size: 12px; padding: 6px 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .magic-chip.active { background: #ff6a00; color: #fff; border-color: #ff6a00; }
+  .magic-status {
+    font-size: 11px; color: #4CAF50; margin-top: 6px; min-height: 16px;
+  }
+  .magic-divider {
+    height: 1px; background: rgba(255,255,255,0.06); margin: 20px 0;
+  }
+  .magic-reset {
+    background: #2c2c2e; border: none; border-radius: 12px;
+    color: #ff453a; font-size: 14px; font-weight: 600;
+    padding: 14px; width: 100%; cursor: pointer; margin-top: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">Calculadora</div>
+  <div class="topbar-menu" id="menuBtn">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/>
+    </svg>
+  </div>
+</div>
+
+<div class="display">
+  <div class="digits-row" id="main">0</div>
+</div>
+
+<div class="keypad">
+  <button class="btn btn-func" id="acBtn" onclick="pressClear()">AC</button>
+  <button class="btn btn-func" onclick="deleteLast()">
+    <svg width="24" height="18" viewBox="0 0 28 20" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M10 2H25a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H10L2 10z"/>
+      <line x1="14" y1="7" x2="19" y2="13"/><line x1="19" y1="7" x2="14" y2="13"/>
+    </svg>
+  </button>
+  <button class="btn btn-func" onclick="pressPercent()">%</button>
+  <button class="btn btn-op"   onclick="pressOp('/')">÷</button>
+  <button class="btn btn-num" onclick="pressNum('7')">7</button>
+  <button class="btn btn-num" onclick="pressNum('8')">8</button>
+  <button class="btn btn-num" onclick="pressNum('9')">9</button>
+  <button class="btn btn-op"  onclick="pressOp('×')">×</button>
+  <button class="btn btn-num" onclick="pressNum('4')">4</button>
+  <button class="btn btn-num" onclick="pressNum('5')">5</button>
+  <button class="btn btn-num" onclick="pressNum('6')">6</button>
+  <button class="btn btn-op"  onclick="pressOp('−')">−</button>
+  <button class="btn btn-num" onclick="pressNum('1')">1</button>
+  <button class="btn btn-num" onclick="pressNum('2')">2</button>
+  <button class="btn btn-num" onclick="pressNum('3')">3</button>
+  <button class="btn btn-op"  onclick="pressOp('+')">+</button>
+  <button class="btn btn-func" onclick="pressSign()" style="font-size:17px;">+/−</button>
+  <button class="btn btn-num"  onclick="pressNum('0')">0</button>
+  <button class="btn btn-num"  onclick="pressDot()">,</button>
+  <button class="btn btn-eq"   onclick="pressEquals()">=</button>
+</div>
+
+<!-- PANEL MÁGICO -->
+<div class="magic" id="magic">
+  <div class="magic-header">
+    <div class="magic-title">🎩 Panel mágico</div>
+    <button class="magic-close" onclick="closeMagic()">Cerrar</button>
+  </div>
+  <div class="magic-body">
+
+    <!-- RESULTADO FALSO -->
+    <div class="magic-section">
+      <div class="magic-section-title">Resultado falso</div>
+      <div class="magic-card">
+        <div class="magic-card-title">Número personalizado</div>
+        <div class="magic-card-desc">Al pulsar = aparecerá este número en vez del resultado real</div>
+        <div class="magic-row">
+          <span class="magic-label">Número</span>
+          <input class="magic-input" id="mFakeNum" type="text" inputmode="numeric" placeholder="Ej: 7">
+        </div>
+        <div class="magic-row">
+          <span class="magic-label">Pulsaciones de = necesarias</span>
+          <div class="magic-btn-group" id="mEqTaps">
+            <div class="magic-chip active" data-val="1">1</div>
+            <div class="magic-chip" data-val="2">2</div>
+            <div class="magic-chip" data-val="3">3</div>
+            <div class="magic-chip" data-val="4">4</div>
+            <div class="magic-chip" data-val="5">5</div>
+          </div>
+        </div>
+        <div class="magic-card-desc" style="margin-top:8px;margin-bottom:0;">Si pones 3, las 2 primeras veces da el resultado real y la 3ª el tuyo</div>
+      </div>
+    </div>
+
+    <!-- TRUCOS DE TIEMPO -->
+    <div class="magic-section">
+      <div class="magic-section-title">Trucos de tiempo</div>
+      <div class="magic-card">
+        <div class="magic-card-title">Mostrar hora actual</div>
+        <div class="magic-card-desc">Al pulsar = aparece la hora actual (HH:MM) como resultado</div>
+        <div class="magic-row">
+          <span class="magic-label">Activar</span>
+          <div class="magic-toggle" id="mShowTime" onclick="toggleMagic(this)"></div>
+        </div>
+      </div>
+      <div class="magic-card">
+        <div class="magic-card-title">Mostrar fecha</div>
+        <div class="magic-card-desc">Al pulsar = aparece la fecha como resultado (DDMMAAAA)</div>
+        <div class="magic-row">
+          <span class="magic-label">Activar</span>
+          <div class="magic-toggle" id="mShowDate" onclick="toggleMagic(this)"></div>
+        </div>
+      </div>
+      <div class="magic-card">
+        <div class="magic-card-title">Mostrar edad</div>
+        <div class="magic-card-desc">Pon el año de nacimiento del espectador. Al pulsar = muestra su edad</div>
+        <div class="magic-row">
+          <span class="magic-label">Año nacimiento</span>
+          <input class="magic-input" id="mBirthYear" type="number" inputmode="numeric" placeholder="2008">
+        </div>
+        <div class="magic-row">
+          <span class="magic-label">Activar</span>
+          <div class="magic-toggle" id="mShowAge" onclick="toggleMagic(this)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRUCOS DE NÚMERO -->
+    <div class="magic-section">
+      <div class="magic-section-title">Trucos de número</div>
+      <div class="magic-card">
+        <div class="magic-card-title">Número del teléfono</div>
+        <div class="magic-card-desc">Pon las últimas cifras del teléfono de alguien. Parece que la calculadora las "adivina"</div>
+        <div class="magic-row">
+          <span class="magic-label">Últimas cifras</span>
+          <input class="magic-input" id="mPhone" type="text" inputmode="numeric" placeholder="1234">
+        </div>
+        <div class="magic-row">
+          <span class="magic-label">Activar</span>
+          <div class="magic-toggle" id="mShowPhone" onclick="toggleMagic(this)"></div>
+        </div>
+      </div>
+      <div class="magic-card">
+        <div class="magic-card-title">Número invertido</div>
+        <div class="magic-card-desc">Al pulsar = el resultado aparece al revés (123 → 321). Ideal para trucos de espejo</div>
+        <div class="magic-row">
+          <span class="magic-label">Activar</span>
+          <div class="magic-toggle" id="mReverse" onclick="toggleMagic(this)"></div>
+        </div>
+      </div>
+      <div class="magic-card">
+        <div class="magic-card-title">Siempre el mismo resultado</div>
+        <div class="magic-card-desc">Haga lo que haga, cualquier operación siempre da el mismo número</div>
+        <div class="magic-row">
+          <span class="magic-label">Número fijo</span>
+          <input class="magic-input" id="mAlways" type="text" inputmode="numeric" placeholder="42">
+        </div>
+        <div class="magic-row">
+          <span class="magic-label">Activar</span>
+          <div class="magic-toggle" id="mShowAlways" onclick="toggleMagic(this)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EFECTO SWIPE -->
+    <div class="magic-section">
+      <div class="magic-section-title">Efecto deslizar</div>
+      <div class="magic-card">
+        <div class="magic-card-title">Comportamiento al deslizar</div>
+        <div class="magic-card-desc">Elige qué pasa con los dígitos restantes cuando deslizas uno fuera</div>
+        <div class="magic-row">
+          <div class="magic-btn-group" id="mSwipeMode">
+            <div class="magic-chip active" data-val="shift">Se desplazan</div>
+            <div class="magic-chip" data-val="stay">Se quedan quietos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESET -->
+    <div class="magic-section">
+      <button class="magic-reset" onclick="resetAll()">Desactivar todo</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // === ESTADO CALCULADORA ===
+  let cur = '0', prevVal = null, op = null, freshCalc = false;
+  const mainEl = document.getElementById('main');
+  const acBtn  = document.getElementById('acBtn');
+
+  // === ESTADO MAGIA ===
+  let magic = {
+    fakeNum: null,
+    eqTapsNeeded: 1,
+    eqTapCount: 0,
+    showTime: false,
+    showDate: false,
+    showAge: false,
+    birthYear: null,
+    showPhone: false,
+    phone: null,
+    reverse: false,
+    alwaysSame: false,
+    alwaysNum: null,
+    swipeMode: 'shift' // 'shift' o 'stay'
+  };
+
+  // Cargar config
+  try {
+    const s = localStorage.getItem('magic');
+    if (s) Object.assign(magic, JSON.parse(s));
+  } catch(e) {}
+
+  function saveMagic() {
+    try { localStorage.setItem('magic', JSON.stringify(magic)); } catch(e) {}
+  }
+
+  // === RENDER ===
+  function renderSpans(val) {
+    mainEl.innerHTML = '';
+    val.split('').forEach(c => {
+      const s = document.createElement('span');
+      s.className = 'digit-char';
+      s.textContent = c;
+      mainEl.appendChild(s);
+    });
+    const l = val.replace(/[-,.]/g,'').length;
+    mainEl.className = 'digits-row' + (l > 9 ? ' sz-sm' : l > 6 ? ' sz-med' : '');
+    acBtn.textContent = (cur === '0' && prevVal === null && op === null) ? 'AC' : 'C';
+  }
+
+  // === CALCULADORA ===
+  function toNum(s) { return parseFloat(s.replace(',','.')); }
+  function toStr(n) {
+    if (!isFinite(n)) return 'Error';
+    return parseFloat(n.toPrecision(12)).toString().replace('.',',');
+  }
+  function pressNum(d) {
+    if (freshCalc) { cur = d; freshCalc = false; magic.eqTapCount = 0; }
+    else cur = cur === '0' ? d : cur + d;
+    renderSpans(cur);
+  }
+  function pressDot() {
+    if (freshCalc) { cur = '0,'; freshCalc = false; renderSpans(cur); return; }
+    if (!cur.includes(',')) { cur += ','; renderSpans(cur); }
+  }
+  function pressOp(o) {
+    freshCalc = false;
+    magic.eqTapCount = 0;
+    if (prevVal !== null && op) prevVal = compute(prevVal, toNum(cur), op);
+    else prevVal = toNum(cur);
+    op = o; cur = '0'; renderSpans(cur);
+  }
+
+  function pressEquals() {
+    if (op === null || prevVal === null) return;
+
+    // Calcular resultado real primero
+    let realResult = toStr(compute(prevVal, toNum(cur), op));
+
+    // Contar pulsaciones de =
+    magic.eqTapCount++;
+
+    // Determinar si mostrar resultado mágico
+    let magicResult = null;
+
+    if (magic.eqTapCount >= magic.eqTapsNeeded) {
+      // Trucos de tiempo
+      if (magic.showTime) {
+        const now = new Date();
+        magicResult = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+      }
+      else if (magic.showDate) {
+        const now = new Date();
+        magicResult = String(now.getDate()).padStart(2,'0') +
+                      String(now.getMonth()+1).padStart(2,'0') +
+                      String(now.getFullYear());
+      }
+      else if (magic.showAge && magic.birthYear) {
+        const age = new Date().getFullYear() - parseInt(magic.birthYear);
+        magicResult = String(age);
+      }
+      // Trucos de número
+      else if (magic.showPhone && magic.phone) {
+        magicResult = magic.phone;
+      }
+      else if (magic.reverse) {
+        magicResult = realResult.split('').reverse().join('');
+      }
+      else if (magic.alwaysSame && magic.alwaysNum) {
+        magicResult = magic.alwaysNum;
+      }
+      else if (magic.fakeNum) {
+        magicResult = String(magic.fakeNum);
+      }
+    }
+
+    // Si hay resultado mágico y ya toca, mostrarlo
+    if (magicResult !== null) {
+      cur = magicResult.replace('.',',');
+    } else {
+      cur = realResult;
+    }
+
+    prevVal = null; op = null; freshCalc = true;
+    renderSpans(cur);
+  }
+
+  function compute(a, b, o) {
+    if (o==='+') return a+b; if (o==='−') return a-b;
+    if (o==='×') return a*b; if (o==='/') return b!==0?a/b:NaN;
+    return b;
+  }
+  function pressClear() { cur='0'; prevVal=null; op=null; freshCalc=false; magic.eqTapCount=0; renderSpans('0'); }
+  function deleteLast() {
+    if (freshCalc) { pressClear(); return; }
+    cur = cur.length > 1 ? cur.slice(0,-1) : '0';
+    renderSpans(cur);
+  }
+  function pressPercent() { cur = toStr(toNum(cur)/100); renderSpans(cur); }
+  function pressSign() {
+    if (cur !== '0') { cur = cur.startsWith('-') ? cur.slice(1) : '-'+cur; renderSpans(cur); }
+  }
+
+  // === SWIPE ===
+  let tx0 = null, ty0 = null, swiping = false, digitRemoved = false;
+
+  mainEl.addEventListener('touchstart', e => {
+    tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY;
+    swiping = false; digitRemoved = false;
+    mainEl.querySelectorAll('.digit-char').forEach(s => {
+      s.style.transition = 'none'; s.style.opacity = '1'; s.style.transform = '';
+    });
+  }, {passive: true});
+
+  mainEl.addEventListener('touchmove', e => {
+    if (tx0 === null || digitRemoved) return;
+    const dx = e.touches[0].clientX - tx0;
+    const dy = Math.abs(e.touches[0].clientY - ty0);
+    if (dy > 18 && !swiping) { tx0 = null; return; }
+    if (dx > 6) swiping = true;
+    if (!swiping || dx <= 0) return;
+
+    const spans = Array.from(mainEl.querySelectorAll('.digit-char'));
+    if (!spans.length) return;
+    const last = spans[spans.length - 1];
+    const rest = spans.slice(0, -1);
+    const threshold = 35;
+    const progress = Math.min(dx / threshold, 1);
+
+    last.style.transition = 'none';
+    last.style.opacity = String(Math.max(0, 1 - progress * 1.2));
+    last.style.transform = `translateX(${progress * 30}px)`;
+
+    // Los demás según el modo de swipe
+    if (magic.swipeMode === 'shift') {
+      rest.forEach(s => {
+        s.style.transition = 'none';
+        s.style.transform = `translateX(${progress * 4}px)`;
+      });
+    }
+    // Si es 'stay', no se mueven
+
+    if (progress >= 1 && !digitRemoved) {
+      digitRemoved = true;
+      cur = cur.length > 1 ? cur.slice(0, -1) : '0';
+      setTimeout(() => renderSpans(cur), 50);
+    }
+  }, {passive: true});
+
+  mainEl.addEventListener('touchend', e => {
+    if (!swiping || digitRemoved) { tx0 = null; swiping = false; return; }
+    const dx = e.changedTouches[0].clientX - tx0;
+    if (dx > 20 && cur !== '0') {
+      cur = cur.length > 1 ? cur.slice(0, -1) : '0';
+      renderSpans(cur);
+    } else {
+      mainEl.querySelectorAll('.digit-char').forEach(s => {
+        s.style.transition = 'opacity 0.1s, transform 0.1s';
+        s.style.opacity = '1'; s.style.transform = '';
+      });
+    }
+    tx0 = null; swiping = false;
+  }, {passive: true});
+
+  // === PANEL MÁGICO ===
+  let taps = 0, tapTimer = null;
+  document.getElementById('menuBtn').addEventListener('click', () => {
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => taps = 0, 2000);
+    if (taps >= 5) { taps = 0; openMagic(); }
+  });
+
+  function openMagic() {
+    syncUI();
+    document.getElementById('magic').classList.add('show');
+  }
+  function closeMagic() {
+    // Leer todos los valores del panel
+    magic.fakeNum = document.getElementById('mFakeNum').value.trim() || null;
+    magic.birthYear = document.getElementById('mBirthYear').value.trim() || null;
+    magic.phone = document.getElementById('mPhone').value.trim() || null;
+    magic.alwaysNum = document.getElementById('mAlways').value.trim() || null;
+    saveMagic();
+    document.getElementById('magic').classList.remove('show');
+  }
+
+  function syncUI() {
+    document.getElementById('mFakeNum').value = magic.fakeNum || '';
+    document.getElementById('mBirthYear').value = magic.birthYear || '';
+    document.getElementById('mPhone').value = magic.phone || '';
+    document.getElementById('mAlways').value = magic.alwaysNum || '';
+
+    syncToggle('mShowTime', magic.showTime);
+    syncToggle('mShowDate', magic.showDate);
+    syncToggle('mShowAge', magic.showAge);
+    syncToggle('mShowPhone', magic.showPhone);
+    syncToggle('mReverse', magic.reverse);
+    syncToggle('mShowAlways', magic.alwaysSame);
+
+    syncChips('mEqTaps', String(magic.eqTapsNeeded));
+    syncChips('mSwipeMode', magic.swipeMode);
+  }
+
+  function syncToggle(id, val) {
+    const el = document.getElementById(id);
+    if (val) el.classList.add('on'); else el.classList.remove('on');
+  }
+  function toggleMagic(el) {
+    el.classList.toggle('on');
+    const id = el.id;
+    if (id === 'mShowTime') magic.showTime = el.classList.contains('on');
+    if (id === 'mShowDate') magic.showDate = el.classList.contains('on');
+    if (id === 'mShowAge') magic.showAge = el.classList.contains('on');
+    if (id === 'mShowPhone') magic.showPhone = el.classList.contains('on');
+    if (id === 'mReverse') magic.reverse = el.classList.contains('on');
+    if (id === 'mShowAlways') magic.alwaysSame = el.classList.contains('on');
+    saveMagic();
+  }
+
+  function syncChips(groupId, activeVal) {
+    document.querySelectorAll(`#${groupId} .magic-chip`).forEach(c => {
+      c.classList.toggle('active', c.dataset.val === activeVal);
+    });
+  }
+
+  // Chip clicks
+  document.querySelectorAll('#mEqTaps .magic-chip').forEach(c => {
+    c.addEventListener('click', () => {
+      magic.eqTapsNeeded = parseInt(c.dataset.val);
+      magic.eqTapCount = 0;
+      syncChips('mEqTaps', c.dataset.val);
+      saveMagic();
+    });
+  });
+  document.querySelectorAll('#mSwipeMode .magic-chip').forEach(c => {
+    c.addEventListener('click', () => {
+      magic.swipeMode = c.dataset.val;
+      syncChips('mSwipeMode', c.dataset.val);
+      saveMagic();
+    });
+  });
+
+  function resetAll() {
+    magic = {
+      fakeNum: null, eqTapsNeeded: 1, eqTapCount: 0,
+      showTime: false, showDate: false,
+      showAge: false, birthYear: null,
+      showPhone: false, phone: null,
+      reverse: false, alwaysSame: false, alwaysNum: null,
+      swipeMode: 'shift'
+    };
+    saveMagic(); syncUI();
+  }
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
